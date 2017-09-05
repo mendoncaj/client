@@ -2,12 +2,12 @@ package com.example.client;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.sleuth.Sampler;
+import org.springframework.cloud.sleuth.Tracer;
 import org.springframework.cloud.sleuth.annotation.NewSpan;
 import org.springframework.cloud.sleuth.annotation.SpanTag;
-import org.springframework.cloud.sleuth.sampler.AlwaysSampler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,15 +17,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @SpringBootApplication
-//@EnableZipkinStreamServer
 public class ClientApplication {
 
 	private Logger logger = LoggerFactory.getLogger(this.getClass());
 
-	@Bean
-	public Sampler defaultSampler() {
-		return new AlwaysSampler();
-	}
+	@Autowired
+	private Tracer tracer;
 
 	@Bean
 	public RestTemplate restTemplate() {
@@ -33,12 +30,16 @@ public class ClientApplication {
 	}
 
 	@GetMapping("hi")
-	@NewSpan("hiMethod")
-	public String hi(@SpanTag("testTag") @RequestParam("param") String param) {
+	@NewSpan
+	public String hi(@SpanTag("param") @RequestParam("param") String param) {
+
+		logger.info("chamada no client hi");
+
 		UriComponentsBuilder builder = UriComponentsBuilder
 				.fromUriString("http://localhost:8081/hi")
 				.queryParam("param", param);
-		logger.info("chamada do cliente hiMethod");
+
+		tracer.getCurrentSpan().logEvent("Finalizou a 1 chamada (client side)");
 		return restTemplate().getForEntity(builder.toUriString(), String.class).getBody();
 	}
 
@@ -47,8 +48,7 @@ public class ClientApplication {
 	public String callMethodWithError(@SpanTag("testTag") @RequestParam("param") String param) {
 		logger.info("chamada do cliente do metodo com error");
 		try {
-			String valor = "x";
-			valor = null;
+			String valor = null;
 			valor.equals("x");
 		} catch (Exception e) {
 			logger.error("Chamada de metodo com error", e);
